@@ -119,7 +119,6 @@ public class AutoChatMod implements ClientModInitializer {
                         .append(Text.literal("] ").formatted(Formatting.DARK_GRAY));
                 MutableText message = Text.literal("Teleporting to " + currentUsername).formatted(Formatting.GRAY);
                 client.player.sendMessage(prefix.append(message), false);
-                ActionMenuScreen.hideOverlay();
             }
 
             if (keyBindPunish.wasPressed()) {
@@ -130,7 +129,6 @@ public class AutoChatMod implements ClientModInitializer {
                         .append(Text.literal("] ").formatted(Formatting.DARK_GRAY));
                 MutableText message = Text.literal("Opening punishment GUI for " + currentUsername).formatted(Formatting.GRAY);
                 client.player.sendMessage(prefix.append(message), false);
-                ActionMenuScreen.hideOverlay();
             }
 
             if (keyBindClose.wasPressed()) {

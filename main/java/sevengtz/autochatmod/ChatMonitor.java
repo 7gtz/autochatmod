@@ -212,10 +212,12 @@ public class ChatMonitor {
             if (pending != null) {
                 LOGGER.info("[AutoChatMod]: Resolved {} -> {}. Opening action menu.", nick, realUsername);
 
+                // Execute detection actions for spam if needed
                 if (pending.isSpam && pending.similarMessages != null) {
                     executeSpamActions(realUsername, pending.originalMessage, pending.similarMessages);
                 }
 
+                // Directly open the action menu for the resolved username
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client.player != null && pending.openActionOnResolve) {
                     client.execute(() -> {
@@ -223,11 +225,16 @@ public class ChatMonitor {
                     });
                 }
 
-                executeActions(realUsername, pending.originalMessage, pending.isSpam);
+                // Only execute flagging actions if the message was actually flagged (not just clicked)
+                if (pending.isSpam || !pending.openActionOnResolve) {
+                    executeActions(realUsername, pending.originalMessage, pending.isSpam);
+                }
             }
 
+            // Handle pending Discord notifications that were waiting for nick resolution
             String pendingDiscordMessage = pendingDiscordNotifications.remove(nick);
             if (pendingDiscordMessage != null) {
+                // Replace the nickname with the real username in the Discord message
                 String resolvedDiscordMessage = pendingDiscordMessage.replace(nick, realUsername);
                 webhook.sendMessage(resolvedDiscordMessage);
                 LOGGER.info("[AutoChatMod]: Sent resolved Discord notification: {}", resolvedDiscordMessage);
