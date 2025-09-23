@@ -358,6 +358,9 @@ public class ChatMonitor {
     private boolean checkForSpam(String message) {
         ConfigManager.Config config = ConfigManager.getConfig();
         long currentTime = Instant.now().toEpochMilli();
+        if(message.startsWith("[*]")) {
+            return false;
+        }
 
         messageHistory.removeIf(entry ->
                 currentTime - entry.timestamp > config.spamTimeWindowSeconds * 1000L);
