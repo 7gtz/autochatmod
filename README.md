@@ -1,5 +1,3 @@
-Of course. Based on the Java files you've provided for your Minecraft moderation mod, here is a comprehensive `README.md` file tailored for other moderators.
-
 ---
 
 # AutoChatMod - A Moderator's Assistant
@@ -112,5 +110,3 @@ The mod has one primary command for manual use:
 These keybinds can be changed in Minecraft's standard `Options -> Controls -> Key Binds` menu under the "AutoChatMod" category.
 
 ---
-
-Good luck, and happy moderating!
