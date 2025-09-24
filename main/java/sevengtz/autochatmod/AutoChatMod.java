@@ -26,18 +26,16 @@ public class AutoChatMod implements ClientModInitializer {
     // Keybinds
     private static KeyBinding keyBindTeleport;
     private static KeyBinding keyBindPunish;
-    private static KeyBinding keyBindClose; // New keybind for closing HUD
+    private static KeyBinding keyBindClose;
 
     @Override
     public void onInitializeClient() {
         LOGGER.info("[AutoChatMod]: Initializing...");
 
-        // Initialize configuration
         ConfigManager.init();
         chatMonitor = new ChatMonitor();
         ActionMenuScreen.registerOverlay();
 
-        // Register chat message modifier to make messages clickable
         ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
             Text modifiedMessage = chatMonitor.makeMessageClickable(message);
             chatMonitor.processMessage(message.getString());
@@ -64,6 +62,9 @@ public class AutoChatMod implements ClientModInitializer {
                                             return 0;
                                         }
                                         client.execute(() -> {
+                                            if (client.currentScreen != null) {
+                                                client.setScreen(null);
+                                            }
                                             LOGGER.debug("[AutoChatMod]: Calling showOverlay for {}", username);
                                             ActionMenuScreen.showOverlay(username);
                                         });
@@ -76,25 +77,25 @@ public class AutoChatMod implements ClientModInitializer {
     }
 
     private void registerKeybinds() {
-        // Assign default keys that match the HUD display
+        // Assign default keys
         keyBindTeleport = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.autochatmod.teleport",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_X, // Set default to 'X'
+                GLFW.GLFW_KEY_X,
                 "category.autochatmod.main"
         ));
 
         keyBindPunish = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.autochatmod.punish",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_P, // Set default to 'P'
+                GLFW.GLFW_KEY_P,
                 "category.autochatmod.main"
         ));
 
         keyBindClose = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.autochatmod.close",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_C, // Set default to 'C'
+                GLFW.GLFW_KEY_C,
                 "category.autochatmod.main"
         ));
 
