@@ -23,7 +23,7 @@ public class ChatMonitor {
     private static final Logger LOGGER = LoggerFactory.getLogger("AutoChatMod");
     private static final Pattern REALNAME_RESPONSE_PATTERN = Pattern.compile("^\\[\\*\\]\\s+(\\w{2,})\\s+is nicknamed as\\s+(\\w{2,})$");
     private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("(?i)§.");
-    private static final Pattern COREPROTECT_PATTERN = Pattern.compile("^\\d+\\.\\d{2}\\s+[dmh]/.*ago.*");
+    private static final Pattern COREPROTECT_PATTERN = Pattern.compile("^\\d+\\.\\d{2}/[dmh]\\s+ago.*");
     private static final Pattern FILTERED_PRIVATE_MESSAGE_PATTERN = Pattern.compile("^\\[S] \\[[^\\]]+] \\[Filtered] (?:\\[[^\\]]+] )?((?:\\* )?(\\w{2,})) » (?:\\[[^\\]]+] )?(?:\\* )?(\\w{2,}): (.*)$");
     private static final Pattern FILTERED_PATTERN = Pattern.compile(".*\\[Filtered]\\s+(\\w{2,})");
     private static final Pattern REPORT_PATTERN = Pattern.compile(".*reported\\s+(\\w{2,})\\s+for.*");
