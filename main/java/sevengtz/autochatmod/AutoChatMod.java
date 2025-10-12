@@ -1,17 +1,21 @@
 package sevengtz.autochatmod;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry; // New Import
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier; // New Import
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +26,10 @@ public class AutoChatMod implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private static ChatMonitor chatMonitor;
+
+    // Create a single instance of the ActionMenuScreen
+    public static final ActionMenuScreen ACTION_MENU = new ActionMenuScreen();
+    private static final Identifier ACTION_MENU_ID = Identifier.of(MOD_ID, "action_menu");
 
     // Keybinds
     private static KeyBinding keyBindTeleport;
@@ -34,7 +42,9 @@ public class AutoChatMod implements ClientModInitializer {
 
         ConfigManager.init();
         chatMonitor = new ChatMonitor();
-        ActionMenuScreen.registerOverlay();
+
+        // Register the HUD element with the registry
+        HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, ACTION_MENU_ID, ACTION_MENU);
 
         ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
             Text modifiedMessage = chatMonitor.makeMessageClickable(message);
@@ -52,9 +62,9 @@ public class AutoChatMod implements ClientModInitializer {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(ClientCommandManager.literal("autochatmod")
                     .then(ClientCommandManager.literal("action")
-                            .then(ClientCommandManager.argument("username", com.mojang.brigadier.arguments.StringArgumentType.word())
+                            .then(ClientCommandManager.argument("username", StringArgumentType.word())
                                     .executes(context -> {
-                                        String username = com.mojang.brigadier.arguments.StringArgumentType.getString(context, "username");
+                                        String username = StringArgumentType.getString(context, "username");
                                         LOGGER.info("[AutoChatMod]: Executing /autochatmod action for username: {}", username);
                                         MinecraftClient client = MinecraftClient.getInstance();
                                         if (client.player == null) {
@@ -65,8 +75,9 @@ public class AutoChatMod implements ClientModInitializer {
                                             if (client.currentScreen != null) {
                                                 client.setScreen(null);
                                             }
-                                            LOGGER.debug("[AutoChatMod]: Calling showOverlay for {}", username);
-                                            ActionMenuScreen.showOverlay(username);
+                                            LOGGER.debug("[AutoChatMod]: Calling show for {}", username);
+                                            // Updated to call the instance method
+                                            ACTION_MENU.show(username);
                                         });
                                         return 1;
                                     })
@@ -100,15 +111,14 @@ public class AutoChatMod implements ClientModInitializer {
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (!ActionMenuScreen.isVisible() || client.player == null) {
-                LOGGER.debug("[AutoChatMod]: Skipping keybind check - isVisible: {}, player: {}",
-                        ActionMenuScreen.isVisible(), client.player);
-                return;
+            // Updated to call the instance method
+            if (!ACTION_MENU.isVisible() || client.player == null) {
+                return; // Simplified the debug log for clarity
             }
 
-            String currentUsername = ActionMenuScreen.getUsername();
+            // Updated to call the instance method
+            String currentUsername = ACTION_MENU.getUsername();
             if (currentUsername == null) {
-                LOGGER.debug("[AutoChatMod]: Skipping keybind check - no username in HUD");
                 return;
             }
 
@@ -139,7 +149,8 @@ public class AutoChatMod implements ClientModInitializer {
                         .append(Text.literal("] ").formatted(Formatting.DARK_GRAY));
                 MutableText message = Text.literal("HUD closed").formatted(Formatting.GRAY);
                 client.player.sendMessage(prefix.append(message), false);
-                ActionMenuScreen.hideOverlay();
+                // Updated to call the instance method
+                ACTION_MENU.hide();
             }
         });
     }

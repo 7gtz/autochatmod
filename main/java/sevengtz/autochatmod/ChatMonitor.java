@@ -22,9 +22,9 @@ public class ChatMonitor {
     private final DiscordWebhook webhook;
     private static final Logger LOGGER = LoggerFactory.getLogger("AutoChatMod");
     private static final Pattern REALNAME_RESPONSE_PATTERN = Pattern.compile("^\\[\\*\\]\\s+(\\w{2,})\\s+is nicknamed as\\s+(\\w{2,})$");
-    private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("(?i)§.");
+    private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("(?i)Â§.");
     private static final Pattern COREPROTECT_PATTERN = Pattern.compile("^\\d+\\.\\d{2}/[dmh]\\s+ago.*");
-    private static final Pattern FILTERED_PRIVATE_MESSAGE_PATTERN = Pattern.compile("^\\[S] \\[[^\\]]+] \\[Filtered] (?:\\[[^\\]]+] )?((?:\\* )?(\\w{2,})) » (?:\\[[^\\]]+] )?(?:\\* )?(\\w{2,}): (.*)$");
+    private static final Pattern FILTERED_PRIVATE_MESSAGE_PATTERN = Pattern.compile("^\\[S] \\[[^\\]]+] \\[Filtered] (?:\\[[^\\]]+] )?((?:\\* )?(\\w{2,})) Â» (?:\\[[^\\]]+] )?(?:\\* )?(\\w{2,}): (.*)$");
     private static final Pattern FILTERED_PATTERN = Pattern.compile(".*\\[Filtered]\\s+(\\w{2,})");
     private static final Pattern REPORT_PATTERN = Pattern.compile(".*reported\\s+(\\w{2,})\\s+for.*");
     private static final Pattern SERVER_FILTERED_PATTERN = Pattern.compile("^\\[S] \\[\\w+] \\[Filtered] (\\w{2,})");
@@ -59,12 +59,16 @@ public class ChatMonitor {
         if (userInfo.isNick) {
             pendingNickResolutions.put(userInfo.username.toLowerCase(),
                     new PendingNickResolution(cleanText, userInfo.username, false, Instant.now().toEpochMilli(), null, true));
-            ClickEvent click = new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/realname " + userInfo.username);
-            HoverEvent hover = new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to resolve and open actions for " + userInfo.username));
+            // Corrected Line
+            ClickEvent click = new ClickEvent.RunCommand("/realname " + userInfo.username);
+            // Corrected Line
+            HoverEvent hover = new HoverEvent.ShowText(Text.literal("Click to resolve and open actions for " + userInfo.username));
             return originalMessage.copy().setStyle(originalMessage.getStyle().withClickEvent(click).withHoverEvent(hover));
         } else {
-            ClickEvent click = new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/autochatmod action " + userInfo.username);
-            HoverEvent hover = new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click for actions on " + userInfo.username));
+            // Corrected Line
+            ClickEvent click = new ClickEvent.RunCommand("/autochatmod action " + userInfo.username);
+            // Corrected Line
+            HoverEvent hover = new HoverEvent.ShowText(Text.literal("Click for actions on " + userInfo.username));
             return originalMessage.copy().setStyle(originalMessage.getStyle().withClickEvent(click).withHoverEvent(hover));
         }
     }
@@ -563,8 +567,10 @@ public class ChatMonitor {
                     .setStyle(Style.EMPTY
                             .withColor(Formatting.YELLOW)
                             .withBold(true)
-                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click for actions on " + finalUsername)))
-                            .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/autochatmod action " + finalUsername)));
+                            // Corrected Line
+                            .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click for actions on " + finalUsername)))
+                            // Corrected Line
+                            .withClickEvent(new ClickEvent.RunCommand("/autochatmod action " + finalUsername)));
             MutableText afterText = Text.literal(afterUsername);
 
             MutableText fullMessage = prefixText.append(beforeText).append(usernameText).append(afterText);
@@ -573,8 +579,10 @@ public class ChatMonitor {
             MutableText messageText = Text.literal(cleanMessage)
                     .setStyle(Style.EMPTY
                             .withColor(Formatting.YELLOW)
-                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click for actions on " + finalUsername)))
-                            .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/autochatmod action " + finalUsername)));
+                            // Corrected Line
+                            .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click for actions on " + finalUsername)))
+                            // Corrected Line
+                            .withClickEvent(new ClickEvent.RunCommand("/autochatmod action " + finalUsername)));
 
             MutableText fullMessage = prefixText.append(messageText);
             client.execute(() -> client.player.sendMessage(fullMessage, false));
