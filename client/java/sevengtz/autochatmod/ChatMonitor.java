@@ -57,18 +57,15 @@ public class ChatMonitor {
         }
 
         if (userInfo.isNick) {
-            pendingNickResolutions.put(userInfo.username.toLowerCase(),
+            String nickKey = userInfo.username.toLowerCase();
+            pendingNickResolutions.put(nickKey,
                     new PendingNickResolution(cleanText, userInfo.username, false, Instant.now().toEpochMilli(), null, true));
-            // Corrected Line
-            ClickEvent click = ClickEvent.runCommand("/realname " + userInfo.username);
-            // Corrected Line
-            HoverEvent hover = HoverEvent.showText(Text.literal("Click to resolve and open actions for " + userInfo.username));
+            ClickEvent click = new ClickEvent.RunCommand("/realname " + userInfo.username);
+            HoverEvent hover = new HoverEvent.ShowText(Text.literal("Test if updated " + userInfo.username));
             return originalMessage.copy().setStyle(originalMessage.getStyle().withClickEvent(click).withHoverEvent(hover));
         } else {
-            // Corrected Line
-            ClickEvent click = ClickEvent.runCommand("/autochatmod action " + userInfo.username);
-            // Corrected Line
-            HoverEvent hover = HoverEvent.showText(Text.literal("Click for actions on " + userInfo.username));
+            ClickEvent click = new ClickEvent.RunCommand("/autochatmod action " + userInfo.username);
+            HoverEvent hover = new HoverEvent.ShowText(Text.literal("Click for actions on " + userInfo.username));
             return originalMessage.copy().setStyle(originalMessage.getStyle().withClickEvent(click).withHoverEvent(hover));
         }
     }
@@ -567,9 +564,7 @@ public class ChatMonitor {
                     .setStyle(Style.EMPTY
                             .withColor(Formatting.YELLOW)
                             .withBold(true)
-                            // Corrected Line
                             .withHoverEvent(HoverEvent.showText(Text.literal("Click for actions on " + finalUsername)))
-                            // Corrected Line
                             .withClickEvent(ClickEvent.runCommand("/autochatmod action " + finalUsername)));
             MutableText afterText = Text.literal(afterUsername);
 
@@ -579,9 +574,7 @@ public class ChatMonitor {
             MutableText messageText = Text.literal(cleanMessage)
                     .setStyle(Style.EMPTY
                             .withColor(Formatting.YELLOW)
-                            // Corrected Line
                             .withHoverEvent(HoverEvent.showText(Text.literal("Click for actions on " + finalUsername)))
-                            // Corrected Line
                             .withClickEvent(ClickEvent.runCommand("/autochatmod action " + finalUsername)));
 
             MutableText fullMessage = prefixText.append(messageText);

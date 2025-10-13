@@ -75,7 +75,16 @@ public class ConfigManager {
         defaultConfig.whitelistedTerms = getDefaultWhitelistedTerms();
         defaultConfig.whitelistedPhrases = getDefaultWhitelistedPhrases();
         defaultConfig.spamWhitelistPrefixes = getDefaultSpamWhitelistPrefixes();
+        defaultConfig.alertSound = SoundOption.EXPERIENCE_ORB;
+        defaultConfig.alertSoundVolume = 1.0F;
+        defaultConfig.alertSoundPitch = 1.0F;
         defaultConfig.enableDiscordPing = false;
+        defaultConfig.alertSoundEnabled = true;
+        defaultConfig.autoOpenOverlayOnFlag = true;
+        defaultConfig.autoOpenPunishGuiOnFlag = false;
+        defaultConfig.instantPunishForSpam = false;
+        defaultConfig.evidenceScreenshotEnabled = true;
+        defaultConfig.evidenceModeratorName = ""; // User needs to set this
         return defaultConfig;
     }
 
@@ -140,5 +149,19 @@ public class ConfigManager {
         public List<String> whitelistedTerms = new ArrayList<>();
         public List<String> whitelistedPhrases = new ArrayList<>();
         public List<String> spamWhitelistPrefixes = new ArrayList<>();
+        public SoundOption alertSound = SoundOption.EXPERIENCE_ORB;
+        public float alertSoundVolume = 1.0F;
+        public float alertSoundPitch = 1.0F;
+        public boolean alertSoundEnabled = true;
+        public boolean autoOpenOverlayOnFlag = true;
+        public boolean autoOpenPunishGuiOnFlag = false;
+        public boolean instantPunishForSpam = false;
+        public int hudX = -1;
+        public int hudY = -1;
+        public int hudWidth = 250;
+        public int hudHeight = 100;
+        public boolean evidenceScreenshotEnabled = true;
+        public String evidenceModeratorName = "";
     }
 }
+ 

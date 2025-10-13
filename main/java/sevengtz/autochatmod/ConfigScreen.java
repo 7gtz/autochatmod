@@ -54,6 +54,24 @@ public class ConfigScreen {
         // Detection Settings
         ConfigCategory detection = builder.getOrCreateCategory(Text.literal("Detection"));
 
+        detection.addEntry(entryBuilder.startBooleanToggle(Text.literal("Auto-Open Overlay on Flag"), config.autoOpenOverlayOnFlag)
+                .setDefaultValue(true)
+                .setTooltip(Text.literal("Automatically open the action overlay when a message is flagged."))
+                .setSaveConsumer(newValue -> config.autoOpenOverlayOnFlag = newValue)
+                .build());
+
+        detection.addEntry(entryBuilder.startBooleanToggle(Text.literal("Auto-Open Punish GUI on Flag"), config.autoOpenPunishGuiOnFlag)
+                .setDefaultValue(false)
+                .setTooltip(Text.literal("Automatically run /punish when a message is flagged."), Text.literal("Requires 'Auto-Open Overlay' to be on."))
+                .setSaveConsumer(newValue -> config.autoOpenPunishGuiOnFlag = newValue)
+                .build());
+
+        detection.addEntry(entryBuilder.startBooleanToggle(Text.literal("Instant Punish for Spam"), config.instantPunishForSpam)
+                .setDefaultValue(false)
+                .setTooltip(Text.literal("If enabled, pressing the Punish keybind on a spammer will run /punish <user> i:1."), Text.literal("The overlay will NOT auto-open for spammers if this is on."))
+                .setSaveConsumer(newValue -> config.instantPunishForSpam = newValue)
+                .build());
+
         detection.addEntry(entryBuilder.startBooleanToggle(Text.literal("Spam Detection"), config.spamDetectionEnabled)
                 .setDefaultValue(true)
                 .setSaveConsumer(newValue -> config.spamDetectionEnabled = newValue)
@@ -138,6 +156,50 @@ public class ConfigScreen {
                 .setTooltip(Text.literal("Phrases that won't trigger alerts"))
                 .setSaveConsumer(newValue -> config.whitelistedPhrases = newValue)
                 .build());
+
+
+
+        ConfigCategory sound = builder.getOrCreateCategory(Text.literal("Sounds"));
+
+        sound.addEntry(entryBuilder.startEnumSelector(Text.literal("Alert Sound"), SoundOption.class, config.alertSound)
+                .setDefaultValue(SoundOption.EXPERIENCE_ORB)
+                .setTooltip(Text.literal("The sound to play when a message is flagged."))
+                .setEnumNameProvider(option -> ((SoundOption) option).toText())
+                .setSaveConsumer(newValue -> config.alertSound = newValue)
+                .build());
+        sound.addEntry(entryBuilder.startFloatField(Text.literal("Alert Sound Volume"), config.alertSoundVolume)
+                .setDefaultValue(1.0F)
+                .setMin(0.0F).setMax(2.0F)
+                .setTooltip(Text.literal("The volume of the alert sound (0.0 to 2.0)"))
+                .setSaveConsumer(newValue -> config.alertSoundVolume = newValue)
+                .build());
+        
+        sound.addEntry(entryBuilder.startFloatField(Text.literal("Alert Sound Pitch"), config.alertSoundPitch)
+                .setDefaultValue(1.0F)
+                .setMin(0.1F).setMax(2.0F)
+                .setTooltip(Text.literal("The pitch of the alert sound (0.1 to 2.0)"))
+                .setSaveConsumer(newValue -> config.alertSoundPitch = newValue)
+                .build());
+        sound.addEntry(entryBuilder.startBooleanToggle(Text.literal("Alert Sound Enabled"), config.alertSoundEnabled)
+                .setDefaultValue(true)
+                .setTooltip(Text.literal("Enable/disable the alert sound"))
+                .setSaveConsumer(newValue -> config.alertSoundEnabled = newValue)
+                .build());
+
+
+        ConfigCategory evidence = builder.getOrCreateCategory(Text.literal("Evidence"));
+
+        evidence.addEntry(entryBuilder.startBooleanToggle(Text.literal("Enable Evidence Screenshots"), config.evidenceScreenshotEnabled)
+                        .setDefaultValue(true)
+                        .setTooltip(Text.literal("Automatically take a screenshot when you mute a player."))
+                        .setSaveConsumer(newValue -> config.evidenceScreenshotEnabled = newValue)
+                        .build());
+                
+        evidence.addEntry(entryBuilder.startStrField(Text.literal("Your Moderator Name"), config.evidenceModeratorName)
+                        .setDefaultValue("")
+                        .setTooltip(Text.literal("Your in-game name. Screenshots will only be taken for mutes you perform."))
+                        .setSaveConsumer(newValue -> config.evidenceModeratorName = newValue)
+                        .build());
 
         return builder.build();
     }

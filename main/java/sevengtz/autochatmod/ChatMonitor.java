@@ -16,15 +16,21 @@ import net.minecraft.text.Style;
 import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.minecraft.client.sound.PositionedSoundInstance;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.Identifier;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.util.math.random.Random;
+
 
 public class ChatMonitor {
     private final Queue<MessageEntry> messageHistory = new ConcurrentLinkedQueue<>();
     private final DiscordWebhook webhook;
     private static final Logger LOGGER = LoggerFactory.getLogger("AutoChatMod");
     private static final Pattern REALNAME_RESPONSE_PATTERN = Pattern.compile("^\\[\\*\\]\\s+(\\w{2,})\\s+is nicknamed as\\s+(\\w{2,})$");
-    private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("(?i)Â§.");
+    private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("(?i)Ã‚Â§.");
     private static final Pattern COREPROTECT_PATTERN = Pattern.compile("^\\d+\\.\\d{2}/[dmh]\\s+ago.*");
-    private static final Pattern FILTERED_PRIVATE_MESSAGE_PATTERN = Pattern.compile("^\\[S] \\[[^\\]]+] \\[Filtered] (?:\\[[^\\]]+] )?((?:\\* )?(\\w{2,})) Â» (?:\\[[^\\]]+] )?(?:\\* )?(\\w{2,}): (.*)$");
+    private static final Pattern FILTERED_PRIVATE_MESSAGE_PATTERN = Pattern.compile("^\\[S] \\[[^\\]]+] \\[Filtered] (?:\\[[^\\]]+] )?((?:\\* )?(\\w{2,})) Ã‚Â» (?:\\[[^\\]]+] )?(?:\\* )?(\\w{2,}): (.*)$");
     private static final Pattern FILTERED_PATTERN = Pattern.compile(".*\\[Filtered]\\s+(\\w{2,})");
     private static final Pattern REPORT_PATTERN = Pattern.compile(".*reported\\s+(\\w{2,})\\s+for.*");
     private static final Pattern SERVER_FILTERED_PATTERN = Pattern.compile("^\\[S] \\[\\w+] \\[Filtered] (\\w{2,})");
@@ -57,17 +63,17 @@ public class ChatMonitor {
         }
 
         if (userInfo.isNick) {
-            pendingNickResolutions.put(userInfo.username.toLowerCase(),
+            // Always create/update the pending resolution on every click
+            // This ensures subsequent clicks work even after the previous resolution was handled
+            String nickKey = userInfo.username.toLowerCase();
+            pendingNickResolutions.put(nickKey,
                     new PendingNickResolution(cleanText, userInfo.username, false, Instant.now().toEpochMilli(), null, true));
-            // Corrected Line
             ClickEvent click = new ClickEvent.RunCommand("/realname " + userInfo.username);
-            // Corrected Line
             HoverEvent hover = new HoverEvent.ShowText(Text.literal("Click to resolve and open actions for " + userInfo.username));
             return originalMessage.copy().setStyle(originalMessage.getStyle().withClickEvent(click).withHoverEvent(hover));
         } else {
-            // Corrected Line
+
             ClickEvent click = new ClickEvent.RunCommand("/autochatmod action " + userInfo.username);
-            // Corrected Line
             HoverEvent hover = new HoverEvent.ShowText(Text.literal("Click for actions on " + userInfo.username));
             return originalMessage.copy().setStyle(originalMessage.getStyle().withClickEvent(click).withHoverEvent(hover));
         }
@@ -149,13 +155,29 @@ public class ChatMonitor {
         if (words.length == 0) {
             return null;
         }
-
-        String lastWord = words[words.length - 1].trim();
-
-        if (lastWord.length() < 2 || !lastWord.matches("\\w{2,}")) {
-            return null;
+    
+        String lastWord = words[words.length - 1].trim(); // This is the potential username
+    
+        // First, determine if it's a nickname by checking for a preceding '*'
+        boolean isNick = false;
+        if (words.length >= 2 && words[words.length - 2].equals("*")) {
+            isNick = true;
         }
-
+    
+        boolean isValidUsername;
+        if (isNick) {
+            // Nicknames can be 1 or more characters long
+            isValidUsername = lastWord.length() >= 1 && lastWord.matches("\\w+");
+        } else {
+            // Regular usernames must be 2 or more characters long
+            isValidUsername = lastWord.length() >= 2 && lastWord.matches("\\w{2,}");
+        }
+    
+        if (!isValidUsername) {
+            return null; // If it doesn't meet the criteria, reject it.
+        }
+    
+        // This is a good safeguard against parsing usernames inside ranks like [Admin]
         int lastWordStart = beforeColon.lastIndexOf(lastWord);
         if (lastWordStart > 0) {
             String beforeWord = beforeColon.substring(0, lastWordStart).trim();
@@ -169,15 +191,8 @@ public class ChatMonitor {
                 }
             }
         }
-
-        boolean isNick = false;
-        if (words.length >= 2) {
-            String secondLastWord = words[words.length - 2];
-            if (secondLastWord.equals("*")) {
-                isNick = true;
-            }
-        }
-
+    
+        // If we've made it this far, the username is valid.
         return new UsernameInfo(lastWord, isNick, messageContent);
     }
 
@@ -206,48 +221,46 @@ public class ChatMonitor {
         }
     }
 
-    private boolean handleRealnameResponse(String message) {
-        Matcher matcher = REALNAME_RESPONSE_PATTERN.matcher(message);
-        if (matcher.find()) {
-            String realUsername = matcher.group(1);
-            String nick = matcher.group(2).toLowerCase();
+    // sevengtz/autochatmod/ChatMonitor.java
 
-            PendingNickResolution pending = pendingNickResolutions.remove(nick);
-            if (pending != null) {
-                LOGGER.info("[AutoChatMod]: Resolved {} -> {}. Opening action menu.", nick, realUsername);
+private boolean handleRealnameResponse(String message) {
+    Matcher matcher = REALNAME_RESPONSE_PATTERN.matcher(message);
+    if (matcher.find()) {
+        String realUsername = matcher.group(1);
+        String originalNick = matcher.group(2); 
+        String nickKey = originalNick.toLowerCase();
 
-                // Execute detection actions for spam if needed
-                if (pending.isSpam && pending.similarMessages != null) {
-                    executeSpamActions(realUsername, pending.originalMessage, pending.similarMessages);
-                }
+        PendingNickResolution pending = pendingNickResolutions.remove(nickKey);
 
-                // Directly open the action menu for the resolved username
-                MinecraftClient client = MinecraftClient.getInstance();
-                if (client.player != null && pending.openActionOnResolve) {
-                    client.execute(() -> {
-                        client.player.networkHandler.sendChatCommand("autochatmod action " + realUsername);
-                    });
-                }
+        LOGGER.info("[AutoChatMod]: Resolved {} -> {}. Opening action menu.", originalNick, realUsername);
 
-                // Only execute flagging actions if the message was actually flagged (not just clicked)
-                if (pending.isSpam || !pending.openActionOnResolve) {
-                    executeActions(realUsername, pending.originalMessage, pending.isSpam);
-                }
-            }
-
-            // Handle pending Discord notifications that were waiting for nick resolution
-            String pendingDiscordMessage = pendingDiscordNotifications.remove(nick);
-            if (pendingDiscordMessage != null) {
-                // Replace the nickname with the real username in the Discord message
-                String resolvedDiscordMessage = pendingDiscordMessage.replace(nick, realUsername);
-                webhook.sendMessage(resolvedDiscordMessage);
-                LOGGER.info("[AutoChatMod]: Sent resolved Discord notification: {}", resolvedDiscordMessage);
-            }
-
-            return true;
+        // --- SIMPLIFIED LOGIC: ALWAYS OPEN THE OVERLAY ---
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            client.execute(() -> {
+                client.player.networkHandler.sendChatCommand("autochatmod action " + realUsername);
+            });
         }
-        return false;
+
+        // If this resolution came from an automatic flag, we can still run the other actions
+        // like playing an alert sound or showing the [FLAGGED] message.
+        if (pending != null && !pending.openActionOnResolve) {
+            executeActions(realUsername, pending.originalMessage, pending.isSpam);
+        }
+
+        // Also, ensure any pending Discord notifications get sent with the resolved name.
+        String pendingDiscordMessage = pendingDiscordNotifications.remove(nickKey);
+        if (pendingDiscordMessage != null) {
+            // Replace the original nickname with the real username in the Discord message
+            String resolvedDiscordMessage = pendingDiscordMessage.replace(originalNick, realUsername);
+            webhook.sendMessage(resolvedDiscordMessage);
+            LOGGER.info("[AutoChatMod]: Sent resolved Discord notification: {}", resolvedDiscordMessage);
+        }
+
+        return true;
     }
+    return false;
+}
 
     private void handleFlaggedMessage(String message, boolean isSpam) {
         UsernameInfo userInfo = extractUsernameInfo(message);
@@ -318,6 +331,7 @@ public class ChatMonitor {
 
     private void executeActions(String username, String originalMessage, boolean isSpam) {
         ConfigManager.Config config = ConfigManager.getConfig();
+        MinecraftClient client = MinecraftClient.getInstance();
         LOGGER.info("[AutoChatMod]: Executing actions for user '{}' on message: {}", username, originalMessage);
 
         if (config.enableDiscordPing && !isSpam) {
@@ -328,6 +342,17 @@ public class ChatMonitor {
 
         displayFlaggedMessage(username, originalMessage, isSpam);
         playAlertSound();
+
+        if (config.autoOpenOverlayOnFlag) {
+            FlagType type = isSpam ? FlagType.SPAM : FlagType.FLAGGED_PHRASE;
+            client.execute(() -> AutoChatMod.ACTION_MENU.show(username, type));
+    
+            // Check the special condition to see if we should auto-punish
+            boolean shouldAutoPunish = config.autoOpenPunishGuiOnFlag && (!isSpam || !config.instantPunishForSpam);
+            if (shouldAutoPunish) {
+                client.execute(() -> client.player.networkHandler.sendChatCommand("punish " + username));
+            }
+        }
     }
 
     private boolean shouldIgnoreMessage(String message) {
@@ -567,9 +592,7 @@ public class ChatMonitor {
                     .setStyle(Style.EMPTY
                             .withColor(Formatting.YELLOW)
                             .withBold(true)
-                            // Corrected Line
                             .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click for actions on " + finalUsername)))
-                            // Corrected Line
                             .withClickEvent(new ClickEvent.RunCommand("/autochatmod action " + finalUsername)));
             MutableText afterText = Text.literal(afterUsername);
 
@@ -579,9 +602,7 @@ public class ChatMonitor {
             MutableText messageText = Text.literal(cleanMessage)
                     .setStyle(Style.EMPTY
                             .withColor(Formatting.YELLOW)
-                            // Corrected Line
                             .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click for actions on " + finalUsername)))
-                            // Corrected Line
                             .withClickEvent(new ClickEvent.RunCommand("/autochatmod action " + finalUsername)));
 
             MutableText fullMessage = prefixText.append(messageText);
@@ -618,18 +639,33 @@ public class ChatMonitor {
     }
 
     private void playAlertSound() {
+
+        if (!ConfigManager.getConfig().alertSoundEnabled) {
+            return; 
+        }
+    
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
-            client.getSoundManager().play(
-                    new net.minecraft.client.sound.PositionedSoundInstance(
-                            SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
-                            net.minecraft.sound.SoundCategory.PLAYERS,
-                            1.0F, 1.0F,
-                            net.minecraft.util.math.random.Random.create(),
-                            client.player.getBlockPos()
-                    )
-            );
-            LOGGER.debug("[AutoChatMod]: Played alert sound for flagged message");
+            try {
+                ConfigManager.Config config = ConfigManager.getConfig();
+                String soundIdString = config.alertSound.getSoundId();
+                Identifier soundId = Identifier.of(soundIdString);
+                SoundEvent soundEvent = SoundEvent.of(soundId);
+    
+                PositionedSoundInstance soundInstance = new PositionedSoundInstance(
+                    soundEvent,
+                    SoundCategory.PLAYERS,
+                    config.alertSoundVolume, // Use custom volume
+                    config.alertSoundPitch,   // Use custom pitch
+                    Random.create(),
+                    client.player.getBlockPos()
+                );
+                client.getSoundManager().play(soundInstance);
+                LOGGER.debug("[AutoChatMod]: Played alert sound '{}'", soundIdString);
+    
+            } catch (Exception e) {
+                LOGGER.error("[AutoChatMod]: Failed to play custom sound.", e);
+            }
         }
     }
 

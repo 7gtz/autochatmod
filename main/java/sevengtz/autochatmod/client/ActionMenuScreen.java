@@ -8,37 +8,53 @@ import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import sevengtz.autochatmod.FlagType;
 import net.minecraft.util.math.ColorHelper;
 import org.lwjgl.glfw.GLFW;
+import net.minecraft.util.Formatting;
+import net.minecraft.client.option.KeyBinding;
+
 import sevengtz.autochatmod.AutoChatMod;
 
 public class ActionMenuScreen implements HudElement {
 
     private static boolean isOverlayVisible = false;
     private static String username = null;
+    private static FlagType currentFlagType = FlagType.MANUAL_CLICK;
 
     // Dragging functionality
     private boolean isDragging = false;
     private double dragStartX = 0;
     private double dragStartY = 0;
+    private boolean isResizing = false;
+    private double resizeStartX = 0;
+    private double resizeStartY = 0;
+
     private int hudX = -1;
     private int hudY = -1;
     private boolean wasMousePressed = false;
 
     // HUD dimensions
-    private static final int BOX_WIDTH = 250;
-    private static final int BOX_HEIGHT = 100;
+    private int hudWidth = 250;
+    private int hudHeight = 100;
     private static final int PADDING = 5;
 
     // Method to show the overlay
-    public void show(String user) {
+    public void show(String user, FlagType type) {
         username = user;
+        currentFlagType = type;
         isOverlayVisible = true;
+
+        sevengtz.autochatmod.ConfigManager.Config config = sevengtz.autochatmod.ConfigManager.getConfig();
+        MinecraftClient client = MinecraftClient.getInstance();
+        this.hudWidth = config.hudWidth;
+        this.hudHeight = config.hudHeight;
+
         // Initialization of position can be done here or in the constructor
         if (hudX == -1) {
-            MinecraftClient client = MinecraftClient.getInstance();
+
             int screenWidth = client.getWindow().getScaledWidth();
-            hudX = screenWidth - BOX_WIDTH - PADDING;
+            hudX = screenWidth - hudWidth - PADDING;
             hudY = PADDING;
         }
     }
@@ -47,6 +63,7 @@ public class ActionMenuScreen implements HudElement {
     public void hide() {
         isOverlayVisible = false;
         username = null;
+        currentFlagType = FlagType.MANUAL_CLICK;
         isDragging = false;
     }
 
@@ -57,10 +74,12 @@ public class ActionMenuScreen implements HudElement {
     public String getUsername() {
         return username;
     }
+    public FlagType getFlagType() { return currentFlagType; }
 
     @Override
     public void render(DrawContext drawContext, RenderTickCounter tickCounter) {
-        if (!isOverlayVisible || username == null || MinecraftClient.getInstance().player == null) {
+        // Exit if the overlay shouldn't be visible
+        if (!isOverlayVisible || username == null) {
             return;
         }
 
@@ -69,38 +88,81 @@ public class ActionMenuScreen implements HudElement {
         int screenWidth = client.getWindow().getScaledWidth();
         int screenHeight = client.getWindow().getScaledHeight();
 
-        // Handle mouse input for dragging
+         // Handle all mouse input for dragging and resizing
         handleMouseInput(client);
 
-        // Ensure HUD stays within screen bounds
-        hudX = Math.max(0, Math.min(hudX, screenWidth - BOX_WIDTH));
-        hudY = Math.max(0, Math.min(hudY, screenHeight - BOX_HEIGHT));
+        // Ensure the HUD stays within the screen bounds
+        this.hudX = Math.max(0, Math.min(this.hudX, screenWidth - this.hudWidth));
+        this.hudY = Math.max(0, Math.min(this.hudY, screenHeight - this.hudHeight));
 
-        // Background rectangle
-        int backgroundColor = isDragging ? ColorHelper.getArgb(200, 50, 50, 100) : ColorHelper.getArgb(180, 0, 0, 0);
-        drawContext.fill(hudX, hudY, hudX + BOX_WIDTH, hudY + BOX_HEIGHT, backgroundColor);
+        // Draw the main background (changes color when moving/resizing)
+        int backgroundColor = (isDragging || isResizing) ? ColorHelper.getArgb(200, 50, 50, 100) : ColorHelper.getArgb(180, 0, 0, 0);
+        drawContext.fill(this.hudX, this.hudY, this.hudX + this.hudWidth, this.hudY + this.hudHeight, backgroundColor);
 
-        // Title bar
+        // Highlight the resize zone on hover
+        double mouseX = client.mouse.getX() * client.getWindow().getScaledWidth() / client.getWindow().getWidth();
+        double mouseY = client.mouse.getY() * client.getWindow().getScaledHeight() / client.getWindow().getHeight();
+        int hotZoneSize = 10;
+        boolean mouseOverResizeZone = !isDragging && mouseX >= this.hudX + this.hudWidth - hotZoneSize && mouseX <= this.hudX + this.hudWidth &&
+                                    mouseY >= this.hudY + this.hudHeight - hotZoneSize && mouseY <= this.hudY + this.hudHeight;
+        if (mouseOverResizeZone) {
+            int highlightColor = ColorHelper.getArgb(100, 255, 255, 255); // Semi-transparent white
+            drawContext.fill(
+                this.hudX + this.hudWidth - hotZoneSize,
+                this.hudY + this.hudHeight - hotZoneSize,
+                this.hudX + this.hudWidth,
+                this.hudY + this.hudHeight,
+                highlightColor
+            );
+        }
+
+        // Draw the title bar and text
         int titleBarHeight = 15;
-        drawContext.fill(hudX, hudY, hudX + BOX_WIDTH, hudY + titleBarHeight, ColorHelper.getArgb(220, 100, 100, 100));
+        drawContext.fill(this.hudX, this.hudY, this.hudX + this.hudWidth, this.hudY + titleBarHeight, ColorHelper.getArgb(220, 100, 100, 100));
+        drawContext.drawText(textRenderer, "Actions for: " + username, this.hudX + PADDING, this.hudY + PADDING, 0xFFFFFFFF, true);
 
-        // Title - Using a safer opaque white and enabling shadow
-        drawContext.drawText(textRenderer, "Actions for: " + username, hudX + PADDING, hudY + PADDING, 0xFFFFFFFF, true);
+        // Dynamically draw actions that have a key bound
+        int yOffset = this.hudY + PADDING + 20;
+        int lineHeight = 15;
 
         // Action 1: Teleport
-        String teleportKey = AutoChatMod.getKeyBindTeleport().getBoundKeyLocalizedText().getString();
-        Text teleportText = Text.literal("Teleport to User (").append(Text.literal(teleportKey).setStyle(Style.EMPTY.withColor(0xFFFF00))).append(")");
-        // Corrected color to be opaque green (0xFF00FF00) and enabled shadow
-        drawContext.drawText(textRenderer, teleportText, hudX + PADDING, hudY + PADDING + 20, 0xFF00FF00, true);
+        KeyBinding teleportBinding = AutoChatMod.getKeyBindTeleport();
+        if (!teleportBinding.isUnbound()) {
+            String key = teleportBinding.getBoundKeyLocalizedText().getString();
+            Text text = Text.literal("Teleport to User (").append(Text.literal(key).setStyle(Style.EMPTY.withColor(Formatting.YELLOW))).append(")");
+            drawContext.drawText(textRenderer, text, this.hudX + PADDING, yOffset, 0xFF00FF00, true); // Green
+            yOffset += lineHeight;
+        }
 
         // Action 2: Punish
-        String punishKey = AutoChatMod.getKeyBindPunish().getBoundKeyLocalizedText().getString();
-        Text punishText = Text.literal("Punish User (").append(Text.literal(punishKey).setStyle(Style.EMPTY.withColor(0xFFFF00))).append(")");
-        // Corrected color to be opaque red (0xFFFF0000) and enabled shadow
-        drawContext.drawText(textRenderer, punishText, hudX + PADDING, hudY + PADDING + 40, 0xFFFF0000, true);
+        KeyBinding punishBinding = AutoChatMod.getKeyBindPunish();
+        if (!punishBinding.isUnbound()) {
+            String key = punishBinding.getBoundKeyLocalizedText().getString();
+            Text text = Text.literal("Punish User (").append(Text.literal(key).setStyle(Style.EMPTY.withColor(Formatting.YELLOW))).append(")");
+            drawContext.drawText(textRenderer, text, this.hudX + PADDING, yOffset, 0xFFFF0000, true); // Red
+            yOffset += lineHeight;
+        }
 
+        // Action 3: Alts
+        KeyBinding altsBinding = AutoChatMod.getKeyBindAlts();
+        if (!altsBinding.isUnbound()) {
+            String key = altsBinding.getBoundKeyLocalizedText().getString();
+            Text text = Text.literal("Check Alts (").append(Text.literal(key).setStyle(Style.EMPTY.withColor(Formatting.YELLOW))).append(")");
+            drawContext.drawText(textRenderer, text, this.hudX + PADDING, yOffset, 0xFFFFFFFF, true); // White
+            yOffset += lineHeight;
+        }
+
+        // Action 4: CheckFly
+        KeyBinding checkflyBinding = AutoChatMod.getKeyBindCheckFly();
+        if (!checkflyBinding.isUnbound()) {
+            String key = checkflyBinding.getBoundKeyLocalizedText().getString();
+            Text text = Text.literal("Run /checkfly (").append(Text.literal(key).setStyle(Style.EMPTY.withColor(Formatting.YELLOW))).append(")");
+            drawContext.drawText(textRenderer, text, this.hudX + PADDING, yOffset, 0xFFFFFFFF, true); // White
+        }
+    
+        // Draw dragging indicator text if dragging
         if (isDragging) {
-            drawContext.drawText(textRenderer, "Dragging...", hudX + PADDING, hudY + BOX_HEIGHT - 15, 0xFFFFFF00, true);
+            drawContext.drawText(textRenderer, "Dragging...", this.hudX + PADDING, this.hudY + this.hudHeight - 15, 0xFFFFFF00, true);
         }
     }
 
@@ -109,24 +171,57 @@ public class ActionMenuScreen implements HudElement {
         double mouseX = client.mouse.getX() * client.getWindow().getScaledWidth() / client.getWindow().getWidth();
         double mouseY = client.mouse.getY() * client.getWindow().getScaledHeight() / client.getWindow().getHeight();
         boolean mousePressed = GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
-
-        boolean mouseOverHUD = mouseX >= hudX && mouseX <= hudX + BOX_WIDTH && mouseY >= hudY && mouseY <= hudY + BOX_HEIGHT;
-
-        if (mousePressed && !wasMousePressed && mouseOverHUD) {
-            isDragging = true;
-            dragStartX = mouseX - hudX;
-            dragStartY = mouseY - hudY;
-        }
-
-        if (isDragging && mousePressed) {
-            hudX = (int)(mouseX - dragStartX);
-            hudY = (int)(mouseY - dragStartY);
-        }
-
-        if (isDragging && !mousePressed) {
+    
+        // Define a "hot zone" for resizing (e.g., the bottom-right corner)
+        int hotZoneSize = 10;
+        boolean mouseOverResizeZone = mouseX >= this.hudX + this.hudWidth - hotZoneSize && mouseX <= this.hudX + this.hudWidth &&
+                                      mouseY >= this.hudY + this.hudHeight - hotZoneSize && mouseY <= this.hudY + this.hudHeight;
+    
+        boolean mouseOverHUD = mouseX >= this.hudX && mouseX <= this.hudX + this.hudWidth &&
+                               mouseY >= this.hudY && mouseY <= this.hudY + this.hudHeight;
+    
+        // When the mouse button is released, stop all actions and save
+        if (!mousePressed && (isDragging || isResizing)) {
             isDragging = false;
+            isResizing = false;
+            // Save the final position and size to the config
+            sevengtz.autochatmod.ConfigManager.Config config = sevengtz.autochatmod.ConfigManager.getConfig();
+            config.hudX = this.hudX;
+            config.hudY = this.hudY;
+            config.hudWidth = this.hudWidth;
+            config.hudHeight = this.hudHeight;
+            sevengtz.autochatmod.ConfigManager.saveConfig();
         }
-
+    
+        // Start a resize if clicking in the hot zone
+        if (mousePressed && !wasMousePressed && mouseOverResizeZone) {
+            isResizing = true;
+            isDragging = false; // Ensure we are not dragging at the same time
+            resizeStartX = mouseX;
+            resizeStartY = mouseY;
+        }
+        // Start a drag if clicking anywhere else on the HUD
+        else if (mousePressed && !wasMousePressed && mouseOverHUD) {
+            isDragging = true;
+            isResizing = false;
+            dragStartX = mouseX - this.hudX;
+            dragStartY = mouseY - this.hudY;
+        }
+    
+        // Update dimensions while resizing
+        if (isResizing && mousePressed) {
+            int minWidth = 150;
+            int minHeight = 75;
+            this.hudWidth = (int) Math.max(minWidth, mouseX - this.hudX);
+            this.hudHeight = (int) Math.max(minHeight, mouseY - this.hudY);
+        }
+    
+        // Update position while dragging
+        if (isDragging && mousePressed) {
+            this.hudX = (int) (mouseX - dragStartX);
+            this.hudY = (int) (mouseY - dragStartY);
+        }
+    
         wasMousePressed = mousePressed;
     }
 }
